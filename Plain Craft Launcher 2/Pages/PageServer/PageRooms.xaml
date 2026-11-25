@@ -1,0 +1,75 @@
+<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL" x:Class="PageRooms" PanScroll="PanBack">
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25,25,25,10" x:Name="ContentPanel">
+            <local:MyCard x:Name="LoginCard" Title="联机身份" Margin="0,0,0,15" UseAnimation="False">
+                <StackPanel Margin="25,40,25,18">
+                    <TextBlock Text="联机服务器（切换后需重启启动器生效）" />
+                    <local:MyComboBox x:Name="ComboServer" Height="28" local:SettingService.Key="CommunityRelay" Margin="0,5,0,15" ToolTip="选择联机使用的服务器，切换后需重启启动器生效。&#xa;· 香港专线：国内/境外兼顾（默认）&#xa;· 宁波专线：国内线路，延迟最低&#xa;· 新加坡专线：仅境外玩家">
+                        <local:MyComboBoxItem Content="香港专线（推荐，国内/境外兼顾）" local:SettingService.Value="0" />
+                        <local:MyComboBoxItem Content="宁波专线（国内推荐，延迟最低）" local:SettingService.Value="1" />
+                        <local:MyComboBoxItem Content="新加坡专线（仅境外玩家）" local:SettingService.Value="2" />
+                    </local:MyComboBox>
+                    <TextBlock Text="昵称（无需注册，随便填）" />
+                    <local:MyTextBox x:Name="Nickname" MaxLength="24" HintText="2 至 24 位，例如：小明" Margin="0,5,0,12" />
+                    <local:MyButton x:Name="BtnAuth" Text="进入联机" Width="140" Height="35" ColorType="Highlight" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="MailStatus" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{DynamicResource ColorBrushGray2}" />
+                </StackPanel>
+            </local:MyCard>
+            <StackPanel x:Name="AccountPanel" Visibility="Collapsed" Margin="0,0,0,20">
+                <DockPanel><local:MyButton x:Name="BtnLogout" Text="退出账号" Height="32" Width="110" DockPanel.Dock="Right" /><TextBlock x:Name="UserSummary" FontSize="16" VerticalAlignment="Center" TextWrapping="Wrap" /></DockPanel>
+            </StackPanel>
+            <StackPanel x:Name="RoomActions" Visibility="Collapsed">
+                <StackPanel x:Name="LobbyPanel" Visibility="Collapsed" Margin="0,0,0,15">
+                    <DockPanel Margin="0,0,0,15">
+                        <local:MyIconButton x:Name="BtnLobbyRefresh" ToolTip="刷新联机大厅" Theme="Black" Width="32" Height="32" LogoScale="0.85" DockPanel.Dock="Right" Margin="10,0,0,0" />
+                        <local:MySearchBox x:Name="LobbySearch" HintText="搜索房间号" />
+                    </DockPanel>
+                    <local:MyCard x:Name="LobbyListCard" Title="公开房间" Visibility="Collapsed" UseAnimation="False">
+                        <StackPanel x:Name="LobbyItems" Margin="20,40,18,15" VerticalAlignment="Top" Grid.IsSharedSizeScope="True" />
+                    </local:MyCard>
+                    <TextBlock x:Name="LobbyStatus" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrushGray2}" Margin="0,10,0,0" />
+                </StackPanel>
+                <local:MyCard x:Name="JoinCard" Title="加入房间" Margin="0,0,0,15" UseAnimation="False"><StackPanel Margin="25,40,25,18">
+                    <TextBlock Text="房间号或邀请链接" /><local:MyTextBox x:Name="RoomNumber" MaxLength="512" Margin="0,5,0,15" />
+                    <local:MyCheckBox x:Name="JoinHasPassword" Text="房间有密码" Height="22" Margin="0,0,0,15" />
+                    <StackPanel x:Name="JoinPasswordPanel" Visibility="Collapsed"><TextBlock Text="房间密码" /><PasswordBox x:Name="JoinPassword" MaxLength="32" Margin="0,5,0,15" /></StackPanel>
+                    <local:MyButton x:Name="BtnJoin" Text="加入房间" Width="130" Height="35" ColorType="Highlight" HorizontalAlignment="Left" />
+                </StackPanel></local:MyCard>
+                <local:MyCard x:Name="CreateCard" Title="创建房间" Margin="0,0,0,15" UseAnimation="False"><StackPanel Margin="25,40,25,18">
+                    <TextBlock Text="房间名称" /><local:MyTextBox x:Name="CreateTitle" MaxLength="60" Margin="0,5,0,12" />
+                    <TextBlock Text="连接来源" /><local:MyComboBox x:Name="TargetMode" Height="28" SelectedIndex="0" Margin="0,5,0,12"><local:MyComboBoxItem Content="Minecraft 局域网世界" /><local:MyComboBoxItem Content="MC 服务器地址" /></local:MyComboBox>
+                    <StackPanel x:Name="LanTargetPanel"><TextBlock Text="Minecraft 局域网端口" /><local:MyTextBox x:Name="HostPort" Text="25565" Margin="0,5,0,12" /></StackPanel>
+                    <StackPanel x:Name="ServerTargetPanel" Visibility="Collapsed"><TextBlock Text="MC 服务器地址" /><local:MyTextBox x:Name="ServerTarget" HintText="例如 play.example.com:25565" MaxLength="260" Margin="0,5,0,12" /></StackPanel>
+                    <local:MyCheckBox x:Name="CreatePublic" Text="公开到联机大厅" Height="22" Margin="0,0,0,12" />
+                    <TextBlock Text="房间密码（留空不设密码）" /><PasswordBox x:Name="CreatePassword" MaxLength="32" Margin="0,5,0,15" />
+                    <local:MyButton x:Name="BtnCreate" Text="创建房间" Width="130" Height="35" HorizontalAlignment="Left" ColorType="Highlight" />
+                </StackPanel></local:MyCard>
+            </StackPanel>
+            <local:MyCard x:Name="ActiveRoom" Title="当前房间" Margin="0,0,0,15" Visibility="Collapsed" UseAnimation="False"><StackPanel Margin="25,40,25,18">
+                <TextBlock x:Name="CurrentRoomName" FontSize="17" TextWrapping="Wrap" Margin="0,0,0,8" />
+                <TextBlock x:Name="CurrentRoomSummary" TextWrapping="Wrap" Margin="0,0,0,12" Foreground="{DynamicResource ColorBrushGray2}" />
+                <TextBlock x:Name="RoomCode" FontSize="20" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <TextBlock x:Name="RoomState" TextWrapping="Wrap" Margin="0,0,0,12" Foreground="{DynamicResource ColorBrushGray2}" />
+                <TextBlock x:Name="GameAddress" TextWrapping="Wrap" Margin="0,0,0,15" />
+                <WrapPanel><local:MyButton x:Name="BtnCopyCode" Text="复制房间号" Height="35" Width="130" Margin="0,0,8,8" /><local:MyButton x:Name="BtnCopyLink" Text="复制邀请链接" Height="35" Width="140" Margin="0,0,8,8" /><local:MyButton x:Name="BtnCopyAddress" Text="复制游戏地址" Height="35" Width="130" Margin="0,0,8,8" /><local:MyButton x:Name="BtnLaunch" Text="进入游戏" Height="35" Width="110" Margin="0,0,8,8" ColorType="Highlight" /><local:MyButton x:Name="BtnLeave" Text="退出房间" Height="35" Width="110" Margin="0,0,8,8" /></WrapPanel>
+                <StackPanel x:Name="OwnerSettings" Visibility="Collapsed" Margin="0,15,0,0">
+                    <TextBlock Text="房间名称" /><local:MyTextBox x:Name="OwnerTitle" MaxLength="60" Margin="0,5,0,12" />
+                    <local:MyCheckBox x:Name="OwnerPublic" Text="公开到联机大厅" Height="22" Margin="0,0,0,12" />
+                    <TextBlock x:Name="OwnerPasswordState" TextWrapping="Wrap" Margin="0,0,0,10" Foreground="{DynamicResource ColorBrushGray2}" />
+                    <local:MyComboBox x:Name="PasswordAction" Height="28" SelectedIndex="0" Margin="0,0,0,12"><local:MyComboBoxItem Content="保留当前密码" /><local:MyComboBoxItem Content="设置新密码" /><local:MyComboBoxItem Content="取消房间密码" /></local:MyComboBox>
+                    <PasswordBox x:Name="OwnerPassword" MaxLength="32" Margin="0,0,0,12" Visibility="Collapsed" />
+                    <WrapPanel><local:MyButton x:Name="BtnSaveRoom" Text="保存房间设置" Width="145" Height="35" Margin="0,0,8,8" /><local:MyButton x:Name="BtnRotateInvite" Text="重新生成邀请链接" Width="175" Height="35" Margin="0,0,8,8" /></WrapPanel>
+                </StackPanel>
+                <local:MyButton x:Name="BtnManagePrefixes" Text="管理 Minecraft 地址" Width="185" Height="35" HorizontalAlignment="Left" Margin="0,15,0,0" />
+                <StackPanel x:Name="PrefixCard" Visibility="Collapsed" Margin="0,20,0,0">
+                    <TextBlock Text="Minecraft 服务器直连地址" FontSize="15" Margin="0,0,0,12" />
+                    <TextBlock Text="自定义前缀" /><local:MyTextBox x:Name="PrefixInput" MaxLength="32" HintText="留空随机生成，每个身份最多两个前缀" Margin="0,5,0,12" />
+                    <WrapPanel><local:MyButton x:Name="BtnAllocatePrefix" Text="申请前缀" Width="120" Height="35" Margin="0,0,8,8" /><local:MyIconButton x:Name="BtnRefreshPrefixes" ToolTip="刷新房间和游戏地址" Theme="Black" Width="32" Height="32" LogoScale="0.85" Margin="0,0,0,8" /></WrapPanel>
+                    <StackPanel x:Name="PrefixItems" Margin="0,10,0,0" />
+                    <TextBlock x:Name="PrefixStatus" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrushGray2}" Margin="0,8,0,0" />
+                </StackPanel>
+            </StackPanel></local:MyCard>
+            <TextBlock x:Name="Status" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrushGray2}" Margin="0,0,0,15" />
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

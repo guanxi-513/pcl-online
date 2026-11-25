@@ -1,0 +1,39 @@
+name: "Minecraft 崩溃"
+description: "CPT 提示 “Minecraft 出现错误”，或游戏崩溃"
+labels: [· Bug, 新提交]
+body:
+- type: checkboxes
+  id: "yml-1"
+  attributes:
+    label: "检查项"
+    description: "请逐个检查下列项目，并勾选确认。"
+    options:
+    - label: "我已尝试不安装 Mod 的游戏，并说明问题是否仅发生于整合包。"
+      required: false
+    - label: "我已说明相同游戏使用其他启动器时的表现，或说明无法对比的原因。"
+      required: true
+    - label: "我已搜索本 CPT 仓库的已有反馈，确认没有重复问题，并知晓 CPT 问题由 HUASQ 处理。"
+      required: true
+- type: textarea
+  id: "yml-2"
+  attributes:
+    label: 描述
+    description: "详细描述具体表现。"
+  validations:
+    required: true
+- type: textarea
+  id: "yml-3"
+  attributes:
+    label: CPT 错误报告、日志与附件
+    description: "上传 CPT 导出的错误报告，或 CPT 程序旁 PCL 文件夹中的 Log1~5.txt；请遮盖账号、令牌、密码和私人服务器地址。"
+    placeholder: "先点击这个文本框，然后再将文件直接拖拽到文本框中以上传。"
+  validations:
+    required: true
+- type: textarea
+  id: "yml-4"
+  attributes:
+    label: HMCL 启动脚本
+    description: "在 HMCL 中进入版本列表，点击版本右侧的三个点，选择 生成启动脚本。"
+    placeholder: "先点击这个文本框，然后再将文件直接拖拽到文本框中以上传。"
+  validations:
+    required: false

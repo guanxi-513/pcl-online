@@ -1,0 +1,91 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { WebSocket } from 'ws';
+import { createApplication } from '../server.mjs';
+
+test('user management, room moderation, CSRF, ticket invalidation and audit', { timeout: 20000 }, async () => {
+  const mails = [], sockets = [], password = 'Pass1234', origin = 'http://127.0.0.1:3210';
+  const server = createApplication({ password: 'local-admin-password-32', origin, database: ':memory:', sendMail: async mail => mails.push(mail) });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let cookie = '', csrf = '';
+  const request = async (route, method = 'GET', body, token = '', override = {}) => {
+    const response = await fetch(base + route, { method, headers: { 'Content-Type': 'application/json', Origin: origin, Cookie: cookie, 'X-CSRF-Token': csrf, ...(token ? { Authorization: 'Bearer ' + token } : {}), ...override }, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: response.status, body: response.status === 204 ? null : await response.json(), headers: response.headers };
+  };
+  const register = async name => {
+    const email = name + '@example.invalid';
+    await request('/api/auth/code', 'POST', { email, purpose: 'register' });
+    const value = await request('/api/auth/register', 'POST', { email, nickname: name, password, code: mails.at(-1).text.match(/\d{6}/)[0] });
+    assert.equal(value.status, 200); return value.body;
+  };
+  const connect = async ticket => {
+    const socket = new WebSocket(base.replace('http:', 'ws:') + '/api/rooms/socket', 'cpt.' + ticket); sockets.push(socket);
+    const ready = once(socket, 'message'); await once(socket, 'open'); await ready; return socket;
+  };
+  try {
+    const host = await register('Host'), guest = await register('Guest'), other = await register('Other');
+    assert.equal((await request('/api/admin/users')).status, 401);
+    const login = await request('/api/admin/login', 'POST', { password: 'local-admin-password-32' });
+    cookie = login.headers.get('set-cookie').split(';')[0]; csrf = login.body.csrf;
+    let users = await request('/api/admin/users?q=Guest&pageSize=10');
+    assert.equal(users.body.total, 1); assert.equal(users.body.users[0].id, guest.user.id); assert.equal(users.body.summary.total, 3);
+    assert.equal((await request('/api/admin/users?pageSize=11')).status, 400);
+    assert.equal((await request('/api/admin/users?q=%27%20OR%201%3D1--')).body.total, 0);
+    const detail = await request('/api/admin/users/' + guest.user.id);
+    assert.equal(detail.body.sessions.length, 1); assert.equal(detail.body.user.nickname, 'Guest'); assert.equal(detail.body.user.password_hash, undefined);
+    assert.equal(JSON.stringify(detail.body).includes(guest.token), false);
+    assert.equal((await request('/api/admin/users/' + guest.user.id, 'PATCH', { nickname: 'Changed', note: 'Reviewed', disabled: false, reason: '' })).status, 200);
+    assert.equal((await request('/api/admin/users/' + other.user.id, 'PATCH', { disabled: true })).status, 400);
+    assert.equal((await request('/api/admin/users/batch', 'POST', { ids: [99999, other.user.id], action: 'disable', reason: 'Invalid batch' })).status, 404);
+    assert.equal((await request('/api/admin/users/' + other.user.id)).body.user.disabled, 0);
+    const create = await request('/api/rooms/create', 'POST', { port: 25565 }, host.token), code = create.body.code;
+    const hostSocket = await connect(create.body.ticket);
+    const join = await request('/api/rooms/join', 'POST', { code }, guest.token); await connect(join.body.ticket);
+    const pending = await request('/api/rooms/join', 'POST', { code }, other.token);
+    const rooms = await request('/api/admin/rooms?q=' + code);
+    assert.equal(rooms.body.total, 1); assert.equal(rooms.body.rooms[0].ownerId, host.user.id); assert.equal(rooms.body.rooms[0].members, 2);
+    let room = await request('/api/admin/rooms/' + code);
+    assert.equal(room.body.members.length, 2); assert.equal(room.body.members[1].nickname, 'Changed');
+    assert.equal(JSON.stringify(room.body).includes('ticket'), false); assert.equal(JSON.stringify(room.body).includes('authorization'), false);
+    assert.equal((await request('/api/admin/rooms/' + code, 'PATCH', { locked: true, reason: 'maintenance' }, '', { 'X-CSRF-Token': 'bad' })).status, 403);
+    assert.equal((await request('/api/admin/rooms/' + code, 'PATCH', { locked: true, capacity: 2, reason: 'maintenance' })).status, 200);
+    const rejected = new WebSocket(base.replace('http:', 'ws:') + '/api/rooms/socket', 'cpt.' + pending.body.ticket);
+    await once(rejected, 'error');
+    assert.equal((await request('/api/rooms/join', 'POST', { code }, other.token)).status, 403);
+    assert.equal((await request('/api/admin/rooms/' + code, 'PATCH', { capacity: 1, reason: 'invalid' })).status, 400);
+    const incoming = new Promise(resolve => hostSocket.on('message', bytes => { const message = JSON.parse(bytes); if (message.type === 'connection') resolve(message); }));
+    const stream = await request('/api/rooms/stream', 'POST', { code }, guest.token); await incoming;
+    room = await request('/api/admin/rooms/' + code);
+    assert.equal(room.body.connections.length, 1);
+    assert.equal((await request(`/api/admin/rooms/${code}/connections/${room.body.connections[0].id}`, 'DELETE', { reason: 'reset connection' })).status, 204);
+    assert.equal((await request('/api/admin/rooms/' + code)).body.connections.length, 0);
+    assert.equal((await request(`/api/admin/rooms/${code}/members/${host.user.id}`, 'DELETE', { reason: 'invalid host kick' })).status, 400);
+    assert.equal((await request(`/api/admin/rooms/${code}/members/${guest.user.id}`, 'DELETE', { block: true, reason: 'moderation' })).status, 204);
+    assert.equal((await request('/api/admin/rooms/' + code)).body.members.length, 1);
+    await request('/api/admin/rooms/' + code, 'PATCH', { locked: false, capacity: 8, reason: 'reopen' });
+    assert.equal((await request('/api/rooms/join', 'POST', { code }, guest.token)).status, 403);
+    assert.equal((await request(`/api/admin/rooms/${code}/blocked/${guest.user.id}`, 'DELETE', { reason: 'restriction lifted' })).status, 204);
+    const rejoin = await request('/api/rooms/join', 'POST', { code }, guest.token); await connect(rejoin.body.ticket);
+    assert.equal((await request(`/api/admin/users/${guest.user.id}/sessions`, 'DELETE', { reason: 'account security' })).status, 200);
+    assert.equal((await request('/api/auth/me', 'GET', undefined, guest.token)).status, 401);
+    assert.equal((await request('/api/admin/rooms/' + code)).body.members.length, 1);
+    assert.equal((await request('/api/admin/users/batch', 'POST', { ids: [host.user.id, other.user.id], action: 'disable', reason: 'moderation batch' })).status, 200);
+    assert.equal((await request('/api/admin/rooms/' + code)).status, 404);
+    assert.equal((await request('/api/admin/users?status=disabled')).body.total, 2);
+    assert.equal((await request('/api/admin/users/batch', 'POST', { ids: [host.user.id, other.user.id], action: 'enable', reason: 'review complete' })).status, 200);
+    assert.equal((await request('/api/auth/me', 'GET', undefined, host.token)).status, 401);
+    const audit = await request('/api/admin/audit?q=maintenance');
+    assert.equal(audit.body.total, 1); assert.equal(audit.body.entries[0].target, code);
+    const all = await request('/api/admin/audit');
+    assert.ok(all.body.total >= 9); assert.equal(JSON.stringify(all.body).includes(password), false);
+    assert.equal((await request('/api/admin/users/' + guest.user.id)).body.user.note, 'Reviewed');
+    assert.equal((await request('/api/admin/rooms/' + code, 'DELETE', { reason: 'already closed' })).status, 404);
+    assert.ok(stream.body.ticket);
+  } finally {
+    for (const socket of sockets) socket.terminate();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => server.close(resolve));
+  }
+});

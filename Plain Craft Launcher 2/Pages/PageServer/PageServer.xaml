@@ -1,0 +1,156 @@
+<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL"
+    x:Class="PageServer" PanScroll="PanBack">
+    <local:MyPageRight.Resources>
+        <Style TargetType="{x:Type local:MyComboBox}" BasedOn="{StaticResource {x:Type local:MyComboBox}}">
+            <Setter Property="Height" Value="28" />
+        </Style>
+    </local:MyPageRight.Resources>
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+            <StackPanel x:Name="ManagementHeading" Margin="0,15,0,18" Visibility="Collapsed">
+                <TextBlock x:Name="ManagementName" FontSize="18" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock x:Name="ManagementAddress" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrushGray2}" />
+                <WrapPanel x:Name="ManagementTabs" Margin="0,15,0,0">
+                    <local:MyRadioButton x:Name="TabStatus" Text="运行状态" Tag="1" ColorType="Highlight" Margin="0,0,8,8" />
+                    <local:MyRadioButton x:Name="TabResources" Text="模组与插件" Tag="2" ColorType="Highlight" Margin="0,0,8,8" />
+                    <local:MyRadioButton x:Name="TabSettings" Text="服务器设置" Tag="3" ColorType="Highlight" Margin="0,0,8,8" />
+                    <local:MyRadioButton x:Name="TabPlayers" Text="玩家管理" Tag="4" ColorType="Highlight" Margin="0,0,8,8" />
+                    <local:MyRadioButton x:Name="TabConnection" Text="连接信息" Tag="0" ColorType="Highlight" Margin="0,0,8,8" />
+                </WrapPanel>
+            </StackPanel>
+            <StackPanel x:Name="Sections">
+                <StackPanel x:Name="ConnectionSection">
+                    <local:MyCard Title="服务器连接" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition /></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="38" /><RowDefinition Height="38" /><RowDefinition Height="38" /><RowDefinition Height="38" /><RowDefinition Height="38" /><RowDefinition Height="38" /></Grid.RowDefinitions>
+                            <TextBlock Text="名称" VerticalAlignment="Center" /><local:MyTextBox x:Name="ProfileName" Grid.Column="1" Margin="0,4" />
+                            <TextBlock Text="服务器系统" Grid.Row="1" VerticalAlignment="Center" /><TextBlock Text="自动检测" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" />
+                            <TextBlock Text="SSH 地址" Grid.Row="2" VerticalAlignment="Center" /><local:MyTextBox x:Name="Host" Grid.Row="2" Grid.Column="1" Margin="0,4" />
+                            <TextBlock Text="SSH 端口" Grid.Row="3" VerticalAlignment="Center" /><local:MyTextBox x:Name="SshPort" Grid.Row="3" Grid.Column="1" Margin="0,4" Text="22" />
+                            <TextBlock Text="SSH 用户" Grid.Row="4" VerticalAlignment="Center" /><local:MyTextBox x:Name="User" Grid.Row="4" Grid.Column="1" Margin="0,4" />
+                            <TextBlock Text="SSH 密码" Grid.Row="5" VerticalAlignment="Center" /><PasswordBox x:Name="Password" Grid.Row="5" Grid.Column="1" Margin="0,4" ToolTip="仅用于本次连接，不保存" />
+                        </Grid>
+                        <TextBlock Text="Linux 提权方式" Margin="0,8,0,0" />
+                        <local:MyComboBox x:Name="ElevationMode" SelectedIndex="1" Margin="0,5,0,8"><local:MyComboBoxItem Content="自动检测（sudo / su）" Tag="auto" /><local:MyComboBoxItem Content="sudo（SSH 用户密码）" Tag="sudo" /><local:MyComboBoxItem Content="su - root（root 密码）" Tag="su" /></local:MyComboBox>
+                        <local:MyCheckBox x:Name="AdvancedDeploy" Text="高级设置" Height="22" Margin="0,8,0,8" />
+                        <StackPanel x:Name="AdvancedConnection" Visibility="Collapsed">
+                            <TextBlock Text="服务器系统" /><local:MyComboBox x:Name="OperatingSystem" Margin="0,5,0,12" SelectedIndex="0"><local:MyComboBoxItem Content="Linux" /><local:MyComboBoxItem Content="Windows" /></local:MyComboBox>
+                            <TextBlock Text="服务器目录" /><local:MyTextBox x:Name="RemoteRoot" Margin="0,5,0,12" />
+                            <TextBlock Text="游戏地址" /><local:MyTextBox x:Name="GameAddress" Margin="0,5,0,12" HintText="使用服务器地址" />
+                        </StackPanel>
+                        <TextBlock x:Name="Fingerprint" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrushGray2}" Margin="0,8" />
+                        <WrapPanel><local:MyButton Text="测试连接" Width="110" Height="32" Click="TestConnection" Margin="0,0,8,8" /><local:MyButton x:Name="BtnNetwork" Text="检测并修复网络" Width="150" Height="32" Click="CheckNetwork" Margin="0,0,8,8" /><local:MyButton x:Name="BtnSaveConnection" Text="保存连接设置" Width="130" Height="32" Click="SaveProfile" Visibility="Collapsed" Margin="0,0,0,8" /><local:MyButton x:Name="BtnContinueDeployment" Text="继续上次部署" Width="140" Height="32" Click="ContinueDeployment" Margin="0,0,8,8" /></WrapPanel>
+                    </StackPanel></local:MyCard>
+                    <local:MyCard x:Name="DeploymentCard" Title="部署并启动" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <TextBlock Text="部署来源" />
+                        <local:MyComboBox x:Name="DeploySource" Margin="0,5,0,12" SelectedIndex="0"><local:MyComboBoxItem Content="下载官方服务端" /><local:MyComboBoxItem Content="导入自定义开服包" /></local:MyComboBox>
+                        <StackPanel x:Name="PackImportPanel" Visibility="Collapsed" Margin="0,0,0,12">
+                            <local:MyButton x:Name="BtnImportPack" Text="选择开服包" Width="140" Height="32" Click="ImportServerPack" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="PackSummary" TextWrapping="Wrap" Margin="0,10,0,0" Foreground="{DynamicResource ColorBrushGray2}" />
+                        </StackPanel>
+                        <StackPanel x:Name="OfficialCorePanel">
+                        <TextBlock Text="服务端" /><local:MyComboBox x:Name="Core" Margin="0,5,0,12" SelectedIndex="0"><local:MyComboBoxItem Content="Vanilla" /><local:MyComboBoxItem Content="Paper" /><local:MyComboBoxItem Content="Fabric" /><local:MyComboBoxItem Content="Forge" /><local:MyComboBoxItem Content="NeoForge" /></local:MyComboBox>
+                        </StackPanel>
+                        <TextBlock Text="Minecraft 版本" /><DockPanel Margin="0,5,0,12"><local:MyButton Text="选择版本" Width="100" DockPanel.Dock="Right" Tag="deploy" Click="ChooseMinecraft" /><local:MyTextBox x:Name="GameVersion" Text="1.21.1" IsReadOnly="True" Margin="0,0,8,0" /></DockPanel>
+                        <StackPanel x:Name="OfficialLoaderPanel"><TextBlock Text="加载器版本" /><DockPanel Margin="0,5,0,12"><local:MyButton Text="选择版本" Width="100" DockPanel.Dock="Right" Tag="deploy" Click="ChooseLoader" /><local:MyTextBox x:Name="LoaderVersion" IsReadOnly="True" HintText="官方推荐 / 稳定版本" Margin="0,0,8,0" /></DockPanel></StackPanel>
+                        <StackPanel x:Name="AdvancedRuntime" Visibility="Collapsed">
+                        <TextBlock Text="Java 版本" /><local:MyComboBox x:Name="JavaMajor" SelectedIndex="0" Margin="0,5,0,12"><local:MyComboBoxItem Content="自动匹配 Minecraft" Tag="0" /><local:MyComboBoxItem Content="Java 8" Tag="8" /><local:MyComboBoxItem Content="Java 11" Tag="11" /><local:MyComboBoxItem Content="Java 16" Tag="16" /><local:MyComboBoxItem Content="Java 17" Tag="17" /><local:MyComboBoxItem Content="Java 21" Tag="21" /><local:MyComboBoxItem Content="Java 25" Tag="25" /></local:MyComboBox>
+                        <TextBlock Text="远端 Java 路径" /><local:MyTextBox x:Name="JavaPath" HintText="自动补全" Margin="0,5,0,12" />
+                        <TextBlock Text="内存 (MiB)" /><local:MyTextBox x:Name="Memory" Text="4096" Margin="0,5,0,12" />
+                        <TextBlock Text="游戏端口" /><local:MyTextBox x:Name="GamePort" Text="25565" Margin="0,5,0,12" />
+                        </StackPanel>
+                        <local:MyCheckBox x:Name="AcceptEula" Text="我已阅读并同意 Minecraft EULA" Height="22" Margin="0,0,0,12" />
+                        <local:MyTextButton Text="Minecraft EULA" local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://www.minecraft.net/eula" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                        <local:MyButton Text="部署并启动" Width="130" Height="32" Click="Deploy" ColorType="Highlight" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="DeploymentResult" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{DynamicResource ColorBrush2}" />
+                    </StackPanel></local:MyCard>
+                </StackPanel>
+                <StackPanel x:Name="StatusSection" Visibility="Collapsed">
+                    <local:MyCard Title="服务器状态" Margin="0,0,0,15"><StackPanel Margin="25,40,25,18">
+                        <TextBlock x:Name="ServerState" Text="尚未查询" FontSize="17" TextWrapping="Wrap" Margin="0,0,0,10" />
+                        <TextBlock x:Name="ServerPlayers" Text="在线玩家：未查询" Foreground="{DynamicResource ColorBrushGray2}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <TextBlock x:Name="PendingSummary" Text="待应用变更：未查询" Foreground="{DynamicResource ColorBrushGray2}" TextWrapping="Wrap" Margin="0,0,0,18" />
+                        <WrapPanel><local:MyButton x:Name="BtnPower" Text="启动服务器" Width="130" Height="35" Click="PowerServer" Margin="0,0,8,8" ColorType="Highlight" /><local:MyButton Text="重启服务器" Width="120" Height="35" Click="RestartServer" Margin="0,0,8,8" /><local:MyButton Text="刷新状态" Width="100" Height="35" Click="Status" Margin="0,0,0,8" /></WrapPanel>
+                        <WrapPanel Margin="0,4,0,0"><local:MyTextButton x:Name="LinkJoin" Content="进入游戏" Margin="0,0,20,8" /><local:MyTextButton x:Name="LinkResources" Content="管理模组与插件" Margin="0,0,20,8" /><local:MyTextButton x:Name="LinkCopyAddress" Content="复制连接地址" Margin="0,0,0,8" /></WrapPanel>
+                    </StackPanel></local:MyCard>
+                    <local:MyCard x:Name="LogCard" Title="服务器日志" CanSwap="True" IsSwapped="True" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <local:MyButton Text="读取最新日志" Width="130" Height="32" Click="Logs" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                        <local:MyTextBox x:Name="ConsoleOutput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto" ShowValidateResult="False" />
+                    </StackPanel></local:MyCard>
+                </StackPanel>
+                <StackPanel x:Name="ResourceSection" Visibility="Collapsed">
+                    <local:MyCheckBox x:Name="ShowResourceSearch" Text="添加模组或插件" Height="22" Margin="0,0,0,15" />
+                    <local:MyCard Title="已安装资源" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <local:MyComboBox x:Name="Category" SelectedIndex="0" Margin="0,0,0,12"><local:MyComboBoxItem Content="Mod (Fabric / Forge / NeoForge)" Tag="mods" /><local:MyComboBoxItem Content="插件 (Paper)" Tag="plugins" /></local:MyComboBox>
+                        <WrapPanel><local:MyButton Text="读取已安装资源" Width="140" Height="32" Click="ListFiles" Margin="0,0,8,8" /><local:MyButton Text="启用 / 禁用" Width="110" Height="32" Click="ToggleFile" Margin="0,0,8,8" /><local:MyButton Text="导入本地 JAR" Width="125" Height="32" Click="ImportLocalResources" Margin="0,0,0,8" /></WrapPanel>
+                        <local:MyScrollViewer MinHeight="40" MaxHeight="180" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="InstalledFiles" /></local:MyScrollViewer>
+                    </StackPanel></local:MyCard>
+                    <local:MyCard Title="待重启安装" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <WrapPanel><local:MyButton Text="刷新队列" Width="100" Height="32" Click="RefreshPending" Margin="0,0,8,8" /><local:MyButton Text="取消选中预安装" Width="145" Height="32" Click="CancelPending" Margin="0,0,8,8" /></WrapPanel>
+                        <local:MyScrollViewer MinHeight="40" MaxHeight="180" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="PendingFiles" /></local:MyScrollViewer>
+                    </StackPanel></local:MyCard>
+                    <local:MyCard x:Name="ResourceSearchCard" Title="搜索模组与插件" Visibility="Collapsed" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <DockPanel Margin="0,0,0,12"><local:MyButton Text="搜索 Modrinth" Width="135" DockPanel.Dock="Right" Click="SearchResources" /><local:MyTextBox x:Name="SearchQuery" Margin="0,0,8,0" /></DockPanel>
+                        <local:MyScrollViewer Height="200" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12"><StackPanel x:Name="SearchResults" /></local:MyScrollViewer>
+                        <local:MyButton Text="预安装选中资源" Width="145" Height="32" Click="InstallSelected" HorizontalAlignment="Left" />
+                    </StackPanel></local:MyCard>
+                    <local:MyCard x:Name="ResourceUrlCard" Title="高级：通过链接安装" Visibility="Collapsed" CanSwap="True" IsSwapped="True" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <TextBlock Text="下载地址 (HTTPS)" /><local:MyTextBox x:Name="ResourceUrl" Margin="0,5,0,12" />
+                        <TextBlock Text="文件名 (.jar)" /><local:MyTextBox x:Name="ResourceName" Margin="0,5,0,12" />
+                        <TextBlock Text="SHA-256" /><local:MyTextBox x:Name="ResourceHash" HintText="可选" Margin="0,5,0,12" />
+                        <local:MyButton Text="远程下载并预安装" Width="160" Height="32" Click="InstallUrl" HorizontalAlignment="Left" />
+                    </StackPanel></local:MyCard>
+                </StackPanel>
+                <StackPanel x:Name="ConfigSection" Visibility="Collapsed">
+                    <local:MyCard x:Name="ConfigPanelCard" Title="服务器配置" Margin="0,0,0,15" UseAnimation="False"><StackPanel Margin="25,40,25,18">
+                        <WrapPanel><local:MyButton Text="读取当前配置" Width="130" Height="32" Click="ReadBasicConfig" Margin="0,0,8,8" /><local:MyButton x:Name="BtnSaveBasic" Text="保存修改" Width="110" Height="32" Click="SaveBasicConfig" IsEnabled="False" Margin="0,0,0,8" ColorType="Highlight" /></WrapPanel>
+                        <local:MySearchBox x:Name="ConfigSearch" HintText="搜索中文名称或英文配置键" Margin="0,8,0,12" />
+                        <TextBlock x:Name="ConfigPanelStatus" Text="尚未读取配置" TextWrapping="Wrap" Margin="0,0,0,10" Foreground="{DynamicResource ColorBrushGray2}" />
+                        <StackPanel x:Name="ConfigFieldsPanel" />
+                        <local:MyButton x:Name="BtnSavePanelBottom" Text="保存修改" Width="110" Height="32" Click="SaveBasicConfig" IsEnabled="False" Margin="0,12,0,0" ColorType="Highlight" HorizontalAlignment="Left" />
+                    </StackPanel></local:MyCard>
+                    <local:MyCard Title="更换游戏版本与加载器" CanSwap="True" IsSwapped="True" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <TextBlock Text="Minecraft 版本" /><DockPanel Margin="0,5,0,12"><local:MyButton Text="选择版本" Width="100" DockPanel.Dock="Right" Tag="runtime" Click="ChooseMinecraft" /><local:MyTextBox x:Name="RuntimeVersion" Text="1.21.1" IsReadOnly="True" Margin="0,0,8,0" /></DockPanel>
+                        <TextBlock Text="服务端 / 加载器" /><local:MyComboBox x:Name="RuntimeCore" Margin="0,5,0,12" SelectedIndex="0"><local:MyComboBoxItem Content="Vanilla" /><local:MyComboBoxItem Content="Paper" /><local:MyComboBoxItem Content="Fabric" /><local:MyComboBoxItem Content="Forge" /><local:MyComboBoxItem Content="NeoForge" /></local:MyComboBox>
+                        <TextBlock Text="加载器版本" /><DockPanel Margin="0,5,0,12"><local:MyButton Text="选择版本" Width="100" DockPanel.Dock="Right" Tag="runtime" Click="ChooseLoader" /><local:MyTextBox x:Name="RuntimeLoaderVersion" IsReadOnly="True" HintText="官方推荐 / 稳定版本" Margin="0,0,8,0" /></DockPanel>
+                        <local:MyCheckBox x:Name="RuntimeAdvanced" Text="高级设置" Height="22" Margin="0,0,0,12" />
+                        <StackPanel x:Name="RuntimeAdvancedPanel" Visibility="Collapsed">
+                        <TextBlock Text="Java 版本" /><local:MyComboBox x:Name="RuntimeJavaMajor" SelectedIndex="0" Margin="0,5,0,12"><local:MyComboBoxItem Content="自动匹配 Minecraft" Tag="0" /><local:MyComboBoxItem Content="Java 8" Tag="8" /><local:MyComboBoxItem Content="Java 11" Tag="11" /><local:MyComboBoxItem Content="Java 16" Tag="16" /><local:MyComboBoxItem Content="Java 17" Tag="17" /><local:MyComboBoxItem Content="Java 21" Tag="21" /><local:MyComboBoxItem Content="Java 25" Tag="25" /></local:MyComboBox>
+                        <TextBlock Text="远端 Java 路径" /><local:MyTextBox x:Name="RuntimeJavaPath" HintText="自动补全" Margin="0,5,0,12" />
+                        <TextBlock Text="内存 (MiB)" /><local:MyTextBox x:Name="RuntimeMemory" Text="4096" Margin="0,5,0,12" />
+                        <TextBlock Text="游戏端口" /><local:MyTextBox x:Name="RuntimePort" Text="25565" Margin="0,5,0,12" />
+                        </StackPanel>
+                        <WrapPanel><local:MyButton Text="读取运行配置" Width="130" Height="32" Click="ReadRuntime" Margin="0,0,8,8" /><local:MyButton Text="准备版本与 Java" Width="150" Height="32" Click="PrepareRuntime" Margin="0,0,8,8" /><local:MyButton Text="取消待应用配置" Width="145" Height="32" Click="CancelRuntime" Margin="0,0,8,8" /></WrapPanel>
+                        <TextBlock x:Name="RuntimeInfo" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource ColorBrushGray2}" />
+                    </StackPanel></local:MyCard>
+                    <local:MyCard Title="高级：配置文件" CanSwap="True" IsSwapped="True" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <WrapPanel><local:MyButton Text="读取配置" Width="100" Height="32" Click="ReadConfig" Margin="0,0,8,8" /><local:MyButton Text="保存并备份" Width="110" Height="32" Click="SaveConfig" Margin="0,0,8,8" /></WrapPanel>
+                        <TextBox x:Name="ConfigText" IsReadOnly="False" IsEnabled="True" IsHitTestVisible="True" AcceptsReturn="True" AcceptsTab="True" Height="280" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13" Padding="10" TextWrapping="NoWrap" />
+                    </StackPanel></local:MyCard>
+                </StackPanel>
+                <StackPanel x:Name="PlayerSection" Visibility="Collapsed">
+                    <local:MyCard Title="玩家" Margin="0,0,0,15"><StackPanel Margin="25,40,25,16">
+                        <local:MyButton Text="刷新玩家名单" Width="130" Height="32" Click="Players" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                        <local:MyTextBox x:Name="PlayerList" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="180" VerticalScrollBarVisibility="Auto" ShowValidateResult="False" Margin="0,0,0,12" />
+                        <TextBlock Text="Minecraft 玩家名称" /><local:MyTextBox x:Name="PlayerName" Margin="0,5,0,12" />
+                        <local:MyComboBox x:Name="PlayerAction" SelectedIndex="0" Margin="0,0,0,12"><local:MyComboBoxItem Content="封禁" Tag="ban" /><local:MyComboBoxItem Content="解封" Tag="pardon" /><local:MyComboBoxItem Content="踢出" Tag="kick" /><local:MyComboBoxItem Content="授予管理员" Tag="op" /><local:MyComboBoxItem Content="撤销管理员" Tag="deop" /><local:MyComboBoxItem Content="加入白名单" Tag="whitelist add" /><local:MyComboBoxItem Content="移出白名单" Tag="whitelist remove" /></local:MyComboBox>
+                        <local:MyButton Text="执行玩家操作" Width="130" Height="32" Click="ManagePlayer" HorizontalAlignment="Left" />
+                    </StackPanel></local:MyCard>
+                </StackPanel>
+            </StackPanel>
+            <local:MyCard x:Name="VersionPicker" Title="选择版本" Visibility="Collapsed" Margin="0,0,0,15">
+                <StackPanel Margin="25,40,25,16">
+                    <WrapPanel><local:MyButton Text="返回" Width="80" Height="32" Click="CloseVersionPicker" Margin="0,0,8,12" /><local:MyButton Text="刷新列表" Width="100" Height="32" Click="ReloadVersionPicker" Margin="0,0,8,12" /><local:MyButton x:Name="PickerAutomatic" Text="自动选择稳定版" Width="150" Height="32" Click="SelectAutomaticLoader" Margin="0,0,0,12" /></WrapPanel>
+                    <local:MyComboBox x:Name="PickerFilter" SelectedIndex="1" Margin="0,0,0,12"><local:MyComboBoxItem Content="全部版本" Tag="all" /><local:MyComboBoxItem Content="正式版 / 稳定版" Tag="release" /><local:MyComboBoxItem Content="快照 / 测试版" Tag="snapshot" /></local:MyComboBox>
+                    <local:MyTextBox x:Name="PickerSearch" HintText="搜索版本" Margin="0,0,0,12" />
+                    <TextBlock x:Name="PickerStatus" TextWrapping="Wrap" Margin="0,0,0,12" Foreground="{DynamicResource ColorBrushGray2}" />
+                    <local:MyLoading x:Name="PickerLoading" Height="40" Visibility="Collapsed" />
+                    <StackPanel x:Name="PickerItems" />
+                </StackPanel>
+            </local:MyCard>
+            <TextBlock x:Name="OperationStatus" Text="就绪" TextWrapping="Wrap" Margin="0,0,0,15" Foreground="{DynamicResource ColorBrushGray2}" />
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

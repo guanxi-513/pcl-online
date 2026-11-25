@@ -1,0 +1,11 @@
+<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL" x:Class="PagePlayServers" PanScroll="PanBack">
+    <Grid>
+        <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="25,25,25,15">
+                <WrapPanel Margin="0,0,0,15"><local:MyButton x:Name="BtnAdd" Text="添加服务器" Width="130" Height="35" ColorType="Highlight" Margin="0,0,8,8" /><local:MyIconButton x:Name="BtnRefresh" ToolTip="刷新服务器状态" Theme="Black" Width="32" Height="32" LogoScale="0.85" Margin="0,0,0,8" /></WrapPanel>
+                <StackPanel x:Name="PanServers" />
+                <TextBlock x:Name="EmptyMessage" Text="暂无服务器" Foreground="{DynamicResource ColorBrushGray2}" />
+            </StackPanel>
+        </local:MyScrollViewer>
+    </Grid>
+</local:MyPageRight>

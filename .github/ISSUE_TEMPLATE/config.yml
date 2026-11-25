@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: CPT 联系与建议
+    url: https://craftpilot.tolike.cn
+    about: CPT 由 HUASQ 独立维护，CPT 问题请在本仓库反馈或通过官网联系，不要直接提交给 PCL 上游。
+  - name: PCL 上游帮助资料
+    url: https://github.com/LTCatt/PCL2Help
+    about: 参考原版帮助文档；这是资料来源，不是 CPT 的反馈入口。

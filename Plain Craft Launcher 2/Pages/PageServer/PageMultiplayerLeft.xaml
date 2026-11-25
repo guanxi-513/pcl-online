@@ -1,0 +1,7 @@
+<local:MyPageLeft xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL" x:Class="PageMultiplayerLeft" AnimatedControl="PanItem" Width="155">
+    <StackPanel x:Name="PanItem" Margin="0,12,0,0">
+        <local:MyListItem x:Name="ItemServers" Title="服务器" Tag="0" Type="RadioBox" Checked="True" Height="36" MinPaddingRight="20" IsScaleAnimationEnabled="False" Logo="M2,2 H30 V10 H2 Z M2,14 H30 V22 H2 Z M2,26 H30 V34 H2 Z" />
+        <local:MyListItem x:Name="ItemRooms" Title="联机房间" Tag="1" Type="RadioBox" Height="36" MinPaddingRight="20" IsScaleAnimationEnabled="False" Logo="M2,2 H14 V10 H2 Z M26,2 H38 V10 H26 Z M14,26 H26 V34 H14 Z M6,14 H10 V18 H30 V14 H34 V22 H22 V26 H18 V22 H6 Z" />
+        <local:MyListItem x:Name="ItemLobby" Title="联机大厅" Tag="2" Type="RadioBox" Height="36" MinPaddingRight="20" IsScaleAnimationEnabled="False" Logo="M0,0 H12 V12 H0 Z M18,0 H30 V12 H18 Z M0,18 H12 V30 H0 Z M18,18 H30 V30 H18 Z" />
+    </StackPanel>
+</local:MyPageLeft>

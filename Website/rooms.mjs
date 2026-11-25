@@ -1,0 +1,397 @@
+import { randomBytes, scrypt, timingSafeEqual, createHash } from 'node:crypto';
+import { promisify } from 'node:util';
+import { WebSocketServer, WebSocket } from 'ws';
+import { ApiError } from './accounts.mjs';
+import { BASE_DOMAIN } from './config.mjs';
+
+export function createRooms(server, accounts, origin, addresses) {
+  const derive = promisify(scrypt);
+  async function passwordHash(value) {
+    if (typeof value !== 'string' || value.length > 32 || value && value.length < 4) throw new ApiError(400, '房间密码可留空，设置时需为 4 至 32 位');
+    if (!value) return null;
+    const salt = randomBytes(16).toString('hex');
+    return { salt, hash: await derive(value, salt, 32) };
+  }
+  function settings(input) {
+    if (input.public !== undefined && typeof input.public !== 'boolean' || input.title !== undefined && (typeof input.title !== 'string' || input.title.trim().length < 1 || input.title.length > 60 || /[\x00-\x1f]/.test(input.title)) || input.targetKind !== undefined && !['lan', 'server'].includes(input.targetKind)) throw new ApiError(400, '房间名称、公开状态或连接方式无效');
+  }
+  const rooms = new Map(), tickets = new Map(), streams = new Map();
+  const ws = new WebSocketServer({ noServer: true, maxPayload: 67108864, perMessageDeflate: false,
+    handleProtocols: protocols => [...protocols].find(value => /^cpt\.[a-f0-9]{64}$/.test(value)) || false });
+  const issue = data => { const token = randomBytes(32).toString('hex'); tickets.set(token, { ...data, expires: Date.now() + 60000 }); return token; };
+  function closeRoom(room) {
+    rooms.delete(room.code);
+    for (const [token, value] of tickets) if (value.room === room) tickets.delete(token);
+    for (const channel of streams.values()) if (channel.room === room) closeStream(channel);
+    room.host?.close(1000, 'Room closed');
+    for (const guest of room.guests.values()) guest.close(1000, 'Room closed');
+  }
+  function kick(room, id, block = false) {
+    if (block) room.blocked.add(id);
+    for (const [token, value] of tickets) if (value.room === room && value.userId === id) tickets.delete(token);
+    const client = room.guests.get(id);
+    room.guests.delete(id);
+    for (const channel of streams.values()) if (channel.room === room && channel.guestId === id) closeStream(channel);
+    client?.close(1008, 'Removed by administrator');
+    if (usable(room.host)) notify(room);
+  }
+  function closeStream(channel, reason) {
+    if (!streams.delete(channel.id)) return;
+    clearTimeout(channel.timer);
+    if (channel.pacer) { clearInterval(channel.pacer); channel.pacer = null; }
+    resumeClient(channel);
+    console.error('[cpt] stream ' + channel.id + ' closed reason=' + (reason || 'peer') + ' up=' + channel.uploadBytes + ' down=' + channel.downloadBytes);
+    channel.tcp?.destroy(); channel.guest?.close(1000, 'Connection ended'); channel.host?.close(1000, 'Connection ended');
+  }
+  function requireMember(user, code) {
+    const room = rooms.get(code);
+    if (!room || !room.host || room.host.readyState !== WebSocket.OPEN || room.owner !== user.id && !room.guests.has(user.id)) throw new ApiError(404, '房间不存在、已关闭或尚未加入');
+    return room;
+  }
+  function describe(room) { return { code: room.code, nickname: room.nickname, title: room.title, public: room.public, passwordRequired: Boolean(room.password), targetKind: room.targetKind, members: room.guests.size + 1, capacity: room.capacity, hostPort: room.ownerPort }; }
+  function invitation(room) { return origin + '/room#' + room.code + '.' + room.invite; }
+  function adminRoom(room) {
+    const channels = [...streams.values()].filter(channel => channel.room === room);
+    return { ...describe(room), gameAddresses: [...(room.prefixes ?? [])].map(prefix => prefix + '.' + BASE_DOMAIN), ownerId: room.owner, createdAt: Math.floor(room.created / 1000), duration: Math.floor((Date.now() - room.created) / 1000), locked: room.locked,
+      state: usable(room.host) ? 'active' : 'waiting', connections: channels.length, readyConnections: channels.filter(channel => usable(channel.host) && (channel.tcp ? !channel.tcp.destroyed : usable(channel.guest))).length,
+      uploadBytes: room.uploadBytes, downloadBytes: room.downloadBytes, lastActivity: Math.floor(room.lastActivity / 1000) };
+  }
+  function notify(room) {
+    const data = JSON.stringify({ type: 'members', members: room.guests.size + 1 });
+    room.host?.send(data); for (const client of room.guests.values()) if (client.readyState === WebSocket.OPEN) client.send(data);
+  }
+  function usable(socket) { return socket?.readyState === WebSocket.OPEN; }
+  // Backpressure: pause the upstream instead of killing the stream when the sink is slow.
+  const PAUSE_BACKLOG = 1024 * 1024, RESUME_BACKLOG = 256 * 1024, KILL_BACKLOG = 64 * 1024 * 1024;
+  function resumeClient(channel) {
+    const client = channel.pausedClient;
+    if (client) {
+      try { if (typeof client.resume === 'function') client.resume(); else client._socket?.resume?.(); } catch {}
+    }
+    channel.pausedClient = null;
+  }
+  function pauseTcp(channel, socket) {
+    let paused = false;
+    try { paused = socket.isPaused(); } catch {}
+    if (paused) return;
+    socket.pause();
+    if (!channel.pacer) channel.pacer = setInterval(() => {
+      if (!channel.tcp || channel.tcp.destroyed) return;
+      let backlog = 0;
+      try { backlog = channel.tcp.isPaused() ? (channel.host ? channel.host.bufferedAmount : 0) : 0; } catch {}
+      if (channel.tcp.isPaused() && backlog < RESUME_BACKLOG) {
+        try { channel.tcp.resume(); } catch {}
+        clearInterval(channel.pacer); channel.pacer = null;
+      }
+    }, 100).unref();
+  }
+  function streamSinkBacklog(channel, role) {
+    if (role === 'host') return channel.tcp ? channel.tcp.writableLength : (channel.guest ? channel.guest.bufferedAmount : 0);
+    return channel.host ? channel.host.bufferedAmount : 0;
+  }
+  function forwardStream(channel, buffer, role) {
+    if (channel.tcp) channel.tcp.write(buffer, error => { if (error) closeStream(channel, 'tcp-write'); });
+    else {
+      const other = role === 'host' ? 'guest' : 'host';
+      if (channel[other]) channel[other].send(buffer, { binary: true }, error => { if (error) closeStream(channel, 'ws-send:' + other + '-fail'); });
+    }
+  }
+  function enqueueStream(channel, buffer, role) {
+    if (channel.queueRole && channel.queueRole !== role) return forwardStream(channel, buffer, role);
+    channel.queueRole = role;
+    channel.queue = channel.queue || [];
+    channel.queueBytes = (channel.queueBytes || 0) + buffer.length;
+    if (channel.queueBytes > 128 * 1024 * 1024) return closeStream(channel, 'queue-overflow');
+    channel.queue.push(buffer);
+    if (!channel.pacer) channel.pacer = setInterval(() => {
+      while (channel.queue && channel.queue.length && streamSinkBacklog(channel, channel.queueRole) < PAUSE_BACKLOG) {
+        const item = channel.queue.shift();
+        channel.queueBytes -= item.length;
+        forwardStream(channel, item, channel.queueRole);
+      }
+      if (channel.queue && !channel.queue.length) {
+        clearInterval(channel.pacer); channel.pacer = null;
+        channel.queue = null; channel.queueRole = null; channel.queueBytes = 0;
+      }
+    }, 50).unref();
+  }
+  function pauseUpstream(channel, client, role) {
+    if (channel.pausedClient === client) return;
+    if (channel.pausedClient && channel.pausedClient !== client) resumeClient(channel);
+    try { if (typeof client.pause === 'function') client.pause(); else client._socket?.pause?.(); } catch {}
+    channel.pausedClient = client; channel.pausedRole = role;
+    if (!channel.pacer) channel.pacer = setInterval(() => {
+      let backlog = 0;
+      if (channel.pausedRole === 'host') backlog = channel.tcp ? channel.tcp.writableLength : (channel.guest ? channel.guest.bufferedAmount : 0);
+      else backlog = channel.host ? channel.host.bufferedAmount : 0;
+      if (backlog < RESUME_BACKLOG) { resumeClient(channel); clearInterval(channel.pacer); channel.pacer = null; }
+    }, 100).unref();
+  }
+  server.on('upgrade', (req, socket, head) => {
+    let pathname;
+    try { pathname = new URL(req.url, origin).pathname; } catch { socket.destroy(); return; }
+    const match = /^cpt\.([a-f0-9]{64})$/.exec(req.headers['sec-websocket-protocol'] ?? '');
+    const data = tickets.get(match?.[1]);
+    if (match) tickets.delete(match[1]);
+    const user = data && accounts.current({ headers: { authorization: data.authorization } });
+    if (!data || data.expires < Date.now() || !user || user.id !== data.userId || req.headers.origin && req.headers.origin !== origin || !rooms.has(data.room.code) || pathname !== '/api/rooms/socket') {
+      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); socket.destroy(); return;
+    }
+    ws.handleUpgrade(req, socket, head, client => {
+      client.alive = true;
+      client.joinedAt = Date.now(); client.lastPong = Date.now();
+      client.on('pong', () => { client.alive = true; client.lastPong = Date.now(); });
+      client.on('error', () => {});
+      const room = data.room;
+      if (data.role === 'host-control') {
+        if (room.host) return client.close(1008, 'Host already connected');
+        room.host = client;
+        room.hostAuthorization = data.authorization;
+        client.on('message', () => client.close(1008, 'Control data not accepted'));
+        client.on('close', () => closeRoom(room));
+        client.send(JSON.stringify({ type: 'ready', ...describe(room) }));
+      } else if (data.role === 'guest-control') {
+        if (!usable(room.host) || room.locked || room.blocked.has(user.id) || room.guests.has(user.id) || room.guests.size >= room.capacity - 1 || [...rooms.values()].some(value => value.owner === user.id || value.guests.has(user.id))) return client.close(1008, 'Room unavailable');
+        room.guests.set(user.id, client);
+        client.nickname = user.nickname;
+        client.authorization = data.authorization;
+        client.on('message', () => client.close(1008, 'Control data not accepted'));
+        client.on('close', () => {
+          if (room.guests.get(user.id) !== client) return;
+          room.guests.delete(user.id);
+          for (const channel of streams.values()) if (channel.room === room && channel.guestId === user.id) closeStream(channel);
+          if (usable(room.host)) notify(room);
+        });
+        client.send(JSON.stringify({ type: 'ready', ...describe(room) })); notify(room);
+      } else {
+        const channel = streams.get(data.streamId);
+        if (!channel || channel.room !== room || !usable(room.host) || (!channel.tcp && !room.guests.has(channel.guestId)) || channel[data.role] || data.role === 'host' && user.id !== room.owner || data.role === 'guest' && user.id !== channel.guestId) return client.close(1008, 'Stream unavailable');
+        channel[data.role] = client;
+        const other = data.role === 'host' ? 'guest' : 'host';
+        client.on('close', (code) => closeStream(channel, 'peer:' + data.role + ':code=' + code));
+        client.on('error', (error) => closeStream(channel, 'ws-error:' + data.role + ':' + String(error && error.message).slice(0, 100)));
+        client.on('message', (buffer, binary) => {
+          const second = Math.floor(Date.now() / 1000);
+          if (room.bandwidthSecond !== second) { room.bandwidthSecond = second; room.bandwidthBytes = 0; }
+          room.bandwidthBytes += buffer.length;
+          if (room.bandwidthBytes > 512 * 1024 * 1024) return closeStream(channel, 'room-bandwidth');
+          const sinkDead = channel.tcp ? channel.tcp.destroyed : !usable(channel[other]);
+          if (sinkDead) return closeStream(channel, 'bad-frame:sinkdead'); if (!binary) return closeStream(channel, 'bad-frame:text:len=' + buffer.length);
+          room.lastActivity = Date.now();
+          if (data.role === 'guest') { room.uploadBytes += buffer.length; channel.uploadBytes += buffer.length; }
+          else { room.downloadBytes += buffer.length; channel.downloadBytes += buffer.length; }
+          if (streamSinkBacklog(channel, data.role) > KILL_BACKLOG) return closeStream(channel, 'sink-stalled');
+          if (streamSinkBacklog(channel, data.role) > PAUSE_BACKLOG) return enqueueStream(channel, buffer, data.role);
+          forwardStream(channel, buffer, data.role);
+        });
+        if (channel.tcp && usable(channel.host)) {
+          clearTimeout(channel.timer);
+          channel.host.send(JSON.stringify({ type: 'ready' }));
+          channel.host.send(channel.initial, { binary: true });
+          channel.initial = null;
+          channel.tcp.setTimeout(300000);
+          channel.tcp.resume();
+        } else if (usable(channel.host) && usable(channel.guest)) {
+          clearTimeout(channel.timer);
+          channel.host.send(JSON.stringify({ type: 'ready' })); channel.guest.send(JSON.stringify({ type: 'ready' }));
+        }
+      }
+    });
+  });
+  const timer = setInterval(() => {
+    for (const [token, ticket] of tickets) if (ticket.expires < Date.now()) tickets.delete(token);
+    for (const room of rooms.values()) {
+      if (!room.host && room.created < Date.now() - 30000) { closeRoom(room); continue; }
+      if (room.host && !accounts.current({ headers: { authorization: room.hostAuthorization } })) { closeRoom(room); continue; }
+      for (const client of room.guests.values()) if (!accounts.current({ headers: { authorization: client.authorization } })) client.close(1008, 'Session expired');
+      for (const socket of [room.host, ...room.guests.values()]) {
+        if (!socket) continue;
+        if (!socket.alive) socket.terminate(); else { socket.alive = false; socket.ping(); }
+      }
+    }
+    for (const channel of streams.values()) {
+      for (const socket of [channel.host, channel.guest]) {
+        if (!socket) continue;
+        if (!socket.alive) {
+          socket.missed = (socket.missed || 0) + 1;
+          if (socket.missed >= 9) socket.terminate();
+        } else { socket.alive = false; socket.missed = 0; socket.ping(); }
+      }
+    }
+    for (const socket of ws.clients) if (socket.readyState === WebSocket.CLOSING) socket.terminate();
+  }, 20000).unref();
+  return {
+    invitationStatus(input) {
+      if (typeof input.code !== 'string' || !/^[A-F0-9]{16}$/.test(input.code) || typeof input.proof !== 'string' || !/^[a-f0-9]{64}$/.test(input.proof)) throw new ApiError(400, '邀请链接格式无效');
+      const room = rooms.get(input.code);
+      if (!room || !usable(room.host) || !accounts.current({ headers: { authorization: room.hostAuthorization } })) return { state: 'expired' };
+      const expected = createHash('sha256').update(room.code + '.' + room.invite).digest();
+      if (!timingSafeEqual(Buffer.from(input.proof, 'hex'), expected)) return { state: 'expired' };
+      return { state: room.locked || room.guests.size >= room.capacity - 1 ? 'unavailable' : 'valid' };
+    },
+    addressList(id) { return addresses.list(id).map(value => { const room = [...rooms.values()].find(room => room.prefixes?.has(value.prefix)); return { ...value, published: Boolean(room && usable(room.host)), roomCode: room?.code ?? null }; }); },
+    unpublish(prefix) {
+      for (const room of rooms.values()) room.prefixes?.delete(prefix);
+      for (const channel of streams.values()) if (channel.prefix === prefix) closeStream(channel);
+    },
+    acceptMinecraft(prefix, socket, initial) {
+      const room = [...rooms.values()].find(value => value.prefixes?.has(prefix));
+      if (!room || !usable(room.host) || room.locked || !accounts.current({ headers: { authorization: room.hostAuthorization } }) || streams.size >= 256 || [...streams.values()].filter(channel => channel.room === room).length >= 32) { socket.destroy(); return; }
+      const id = randomBytes(16).toString('hex');
+      const channel = { id, room, tcp: socket, prefix, guestId: null, created: Date.now(), uploadBytes: 0, downloadBytes: 0, initial: initial(room.gameTargetHost, room.gameTargetPort) };
+      streams.set(id, channel); channel.timer = setTimeout(() => closeStream(channel), 30000).unref();
+      socket.on('close', () => closeStream(channel, 'gateway-tcp-close')); socket.on('error', (error) => closeStream(channel, 'ws-error:' + String(error && error.message).slice(0, 100)));
+      socket.on('data', buffer => {
+        const second = Math.floor(Date.now() / 1000);
+        if (room.bandwidthSecond !== second) { room.bandwidthSecond = second; room.bandwidthBytes = 0; }
+        room.bandwidthBytes += buffer.length;
+        if (!usable(channel.host) || channel.host.bufferedAmount > KILL_BACKLOG || room.bandwidthBytes > 512 * 1024 * 1024) { closeStream(channel, room.bandwidthBytes > 512 * 1024 * 1024 ? 'room-bandwidth' : 'sink-stalled'); return; }
+        if (channel.host.bufferedAmount > PAUSE_BACKLOG) pauseTcp(channel, socket);
+        room.lastActivity = Date.now(); room.uploadBytes += buffer.length; channel.uploadBytes += buffer.length;
+        for (let offset = 0; offset < buffer.length; offset += 32768) channel.host.send(buffer.subarray(offset, offset + 32768), { binary: true }, error => { if (error) closeStream(channel, 'ws-send:host-fail'); });
+      });
+      const ticket = issue({ room, userId: room.owner, authorization: room.hostAuthorization, role: 'host', streamId: id });
+      room.host.send(JSON.stringify({ type: 'connection', ticket }));
+    },
+    stats(query = new URLSearchParams()) {
+      const search = (query.get('q') ?? '').trim().toLowerCase(), state = query.get('state') ?? 'all', sort = query.get('sort') ?? 'newest';
+      const page = Number(query.get('page') ?? 1), pageSize = Number(query.get('pageSize') ?? 25);
+      if (search.length > 100 || !['all', 'active', 'waiting', 'locked'].includes(state) || !['newest', 'members', 'traffic'].includes(sort) || !Number.isSafeInteger(page) || page < 1 || page > 1000000 || ![10, 25, 50, 100].includes(pageSize)) throw new ApiError(400, '房间筛选或分页参数无效');
+      const all = [...rooms.values()].map(adminRoom);
+      const filtered = all.filter(room => (!search || room.code.toLowerCase().includes(search) || room.nickname.toLowerCase().includes(search) || String(room.ownerId) === search) && (state === 'all' || state === 'locked' && room.locked || room.state === state));
+      filtered.sort((a, b) => sort === 'members' ? b.members - a.members : sort === 'traffic' ? (b.uploadBytes + b.downloadBytes) - (a.uploadBytes + a.downloadBytes) : b.createdAt - a.createdAt);
+      return { rooms: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize, pages: Math.max(1, Math.ceil(filtered.length / pageSize)), connections: streams.size,
+        summary: { total: all.length, active: all.filter(room => room.state === 'active').length, members: all.reduce((sum, room) => sum + room.members, 0), connections: streams.size } };
+    },
+    byUser(id) { return [...rooms.values()].filter(room => room.owner === id || room.guests.has(id)).map(room => ({ ...adminRoom(room), role: room.owner === id ? 'host' : 'guest' })); },
+    detail(code) {
+      const room = rooms.get(code); if (!room) throw new ApiError(404, '房间已关闭，请刷新列表');
+      const members = [{ id: room.owner, nickname: room.nickname, role: 'host', socket: room.host }, ...[...room.guests].map(([id, socket]) => ({ id, nickname: socket.nickname, role: 'guest', socket }))].map(member => ({ id: member.id, nickname: member.nickname, role: member.role, connected: usable(member.socket), joinedAt: member.socket ? Math.floor(member.socket.joinedAt / 1000) : null, lastHeartbeat: member.socket ? Math.floor(member.socket.lastPong / 1000) : null }));
+      const connections = [...streams.values()].filter(channel => channel.room === room).map(channel => ({ id: channel.id, userId: channel.guestId, createdAt: Math.floor(channel.created / 1000), state: usable(channel.host) && (channel.tcp ? !channel.tcp.destroyed : usable(channel.guest)) ? 'ready' : 'connecting', uploadBytes: channel.uploadBytes, downloadBytes: channel.downloadBytes }));
+      return { room: adminRoom(room), members, connections, blocked: [...room.blocked] };
+    },
+    configure(code, input) {
+      const room = rooms.get(code); if (!room) throw new ApiError(404, '房间已关闭');
+      if (!Object.keys(input).length || Object.keys(input).some(key => !['locked', 'capacity', 'reason'].includes(key)) || input.locked !== undefined && typeof input.locked !== 'boolean' || input.capacity !== undefined && (!Number.isInteger(input.capacity) || input.capacity < room.guests.size + 1 || input.capacity < 2 || input.capacity > 8)) throw new ApiError(400, '房间设置无效，容量需为 2 至 8 人且不低于当前人数');
+      if (input.locked !== undefined) room.locked = input.locked;
+      if (input.capacity !== undefined) room.capacity = input.capacity;
+      if (room.locked) for (const [token, value] of tickets) if (value.room === room && value.role === 'guest-control') tickets.delete(token);
+      return adminRoom(room);
+    },
+    kick(code, id, block) {
+      const room = rooms.get(code); if (!room) throw new ApiError(404, '房间已关闭');
+      if (id === room.owner) throw new ApiError(400, '房主不能被踢出，请关闭房间');
+      if (!room.guests.has(id)) throw new ApiError(404, '成员已离开房间');
+      kick(room, id, block);
+    },
+    unblock(code, id) { const room = rooms.get(code); if (!room || !room.blocked.delete(id)) throw new ApiError(404, '房间或限制记录不存在'); },
+    disconnect(code, id) { const channel = streams.get(id); if (!channel || channel.room.code !== code) throw new ApiError(404, '连接已结束'); closeStream(channel); },
+    disableUser(id) {
+      for (const [token, value] of tickets) if (value.userId === id) tickets.delete(token);
+      for (const room of rooms.values()) {
+        if (room.owner === id) closeRoom(room); else if (room.guests.has(id)) kick(room, id);
+      }
+    },
+    close(code) { const room = rooms.get(code); if (!room) throw new ApiError(404, '房间已关闭'); closeRoom(room); },
+    dispose() { clearInterval(timer); for (const room of rooms.values()) closeRoom(room); for (const socket of ws.clients) socket.terminate(); ws.close(); },
+    async route(req, route, user, input, query = new URLSearchParams()) {
+      const authorization = req.headers.authorization;
+      if (route === '/api/rooms/publish-address' && req.method === 'POST') {
+        const room = requireMember(user, input.code);
+        if (room.owner !== user.id || input.confirmed !== true) throw new ApiError(403, '仅房主可以确认发布 Minecraft 公网地址');
+        const prefix = addresses.validate(input.prefix);
+        if (addresses.owner(prefix) !== user.id) throw new ApiError(403, '该前缀不属于你');
+        if (typeof input.targetHost !== 'string' || input.targetHost.length > 253 || !/^[A-Za-z0-9._:-]+$/.test(input.targetHost) || !Number.isInteger(input.targetPort) || input.targetPort < 1 || input.targetPort > 65535) throw new ApiError(400, 'MC 目标地址无效');
+        if (room.prefixes.size && (room.gameTargetHost !== input.targetHost || room.gameTargetPort !== input.targetPort)) throw new ApiError(409, '同一房间的域名必须指向同一个 MC 目标');
+        for (const entry of rooms.values()) if (entry !== room && entry.prefixes.has(prefix)) throw new ApiError(409, '此前缀已绑定其他房间');
+        room.gameTargetHost = input.targetHost; room.gameTargetPort = input.targetPort; room.prefixes.add(prefix);
+        return { address: prefix + '.' + BASE_DOMAIN, prefix, roomCode: room.code };
+      }
+      if (route === '/api/rooms/unpublish-address' && req.method === 'POST') {
+        const prefix = addresses.validate(input.prefix);
+        if (addresses.owner(prefix) !== user.id) throw new ApiError(403, '不能操作其他用户的前缀');
+        for (const room of rooms.values()) room.prefixes.delete(prefix);
+        for (const channel of streams.values()) if (channel.prefix === prefix) closeStream(channel);
+        return { success: true };
+      }
+      if (route === '/api/rooms/lobby' && req.method === 'GET') {
+        const search = (query.get('code') ?? '').trim().toUpperCase();
+        if (search && !/^[A-F0-9]{16}$/.test(search)) throw new ApiError(400, '搜索时请输入完整的 16 位房间号');
+        const list = [...rooms.values()].filter(room => usable(room.host) && (search ? room.code === search : room.public));
+        const visible = list.filter(room => !room.blocked.has(user.id));
+        return { rooms: visible.map(room => ({ ...describe(room), locked: room.locked })), total: visible.length };
+      }
+      if (route === '/api/rooms/mine' && req.method === 'GET') {
+        const room = [...rooms.values()].find(value => value.owner === user.id || value.guests.has(user.id));
+        if (!room) throw new ApiError(404, '当前不在房间内');
+        return { ...describe(room), hosting: room.owner === user.id, ...(room.owner === user.id ? { shareLink: invitation(room) } : {}) };
+      }
+      if (route === '/api/rooms/settings' && req.method === 'POST') {
+        const room = requireMember(user, input.code);
+        if (room.owner !== user.id) throw new ApiError(403, '只有房主可以修改房间');
+        settings(input);
+        if (input.rotateInvite !== undefined && typeof input.rotateInvite !== 'boolean') throw new ApiError(400, '邀请链接参数无效');
+        const password = input.password === undefined ? undefined : await passwordHash(input.password);
+        if (!rooms.has(room.code) || !usable(room.host) || !accounts.current(req)) throw new ApiError(401, '房间或登录已失效');
+        if (input.public !== undefined) room.public = input.public;
+        if (input.title !== undefined) room.title = input.title.trim();
+        if (password !== undefined) {
+          room.password = password;
+          for (const [ticket, value] of tickets) if (value.room === room && value.role === 'guest-control') tickets.delete(ticket);
+        }
+        if (input.rotateInvite) {
+          room.invite = randomBytes(32).toString('hex');
+          for (const [ticket, value] of tickets) if (value.room === room && value.role === 'guest-control') tickets.delete(ticket);
+        }
+        return { ...describe(room), shareLink: invitation(room) };
+      }
+      if (route === '/api/rooms/create' && req.method === 'POST') {
+        if (rooms.size >= 200 || [...rooms.values()].some(room => room.owner === user.id || room.guests.has(user.id))) throw new ApiError(409, '已有房间或服务暂时已满');
+        if (!Number.isInteger(input.port) || input.port < (input.targetKind === 'server' ? 1 : 1024) || input.port > 65535) throw new ApiError(400, '请输入有效的 Minecraft 端口');
+        settings(input);
+        const password = await passwordHash(input.password ?? '');
+        if (!accounts.current(req)) throw new ApiError(401, '请重新登录');
+        if (rooms.size >= 200 || [...rooms.values()].some(room => room.owner === user.id || room.guests.has(user.id))) throw new ApiError(409, '请先退出当前房间或服务已满');
+        const code = randomBytes(8).toString('hex').toUpperCase();
+        const room = { code, owner: user.id, nickname: user.nickname, title: input.title?.trim() || user.nickname + '的房间', public: input.public ?? false, targetKind: input.targetKind ?? 'lan', password, invite: randomBytes(32).toString('hex'), ownerPort: input.port, guests: new Map(), prefixes: new Set(), created: Date.now(), locked: false, capacity: 8, blocked: new Set(), uploadBytes: 0, downloadBytes: 0, lastActivity: Date.now() };
+        rooms.set(code, room);
+        return { ...describe(room), shareLink: invitation(room), ticket: issue({ room, userId: user.id, authorization, role: 'host-control' }) };
+      }
+      if (route === '/api/rooms/join' && req.method === 'POST') {
+        if (typeof input.code !== 'string' || !/^[A-F0-9]{16}$/.test(input.code.trim().toUpperCase())) throw new ApiError(400, '房间号为 16 位字母或数字');
+        const room = rooms.get(input.code.trim().toUpperCase());
+        if (!room || !usable(room.host)) throw new ApiError(404, '房间不存在或已关闭');
+        if (room.locked || room.blocked.has(user.id)) throw new ApiError(403, '房间暂不接受加入');
+        if ([...rooms.values()].some(value => value.owner === user.id || value.guests.has(user.id))) throw new ApiError(409, '请先退出当前房间');
+        if (room.guests.size >= room.capacity - 1) throw new ApiError(409, '房间已满');
+        const invite = input.invite;
+        if (invite !== undefined && (typeof invite !== 'string' || !/^[a-f0-9]{64}$/.test(invite) || !timingSafeEqual(Buffer.from(invite, 'hex'), Buffer.from(room.invite, 'hex')))) throw new ApiError(403, '邀请链接无效或已重新生成');
+        const originalPassword = room.password;
+        if (!invite && originalPassword) {
+          if (typeof input.password !== 'string' || input.password.length > 32) throw new ApiError(403, '请输入房间密码');
+          const hash = await derive(input.password, originalPassword.salt, 32);
+          if (!timingSafeEqual(hash, originalPassword.hash)) throw new ApiError(403, '房间密码错误');
+        }
+        if (!rooms.has(room.code) || !usable(room.host) || room.password !== originalPassword || invite && invite !== room.invite || room.locked || room.blocked.has(user.id) || !accounts.current(req)) throw new ApiError(403, '房间设置或登录已变化，请重试');
+        return { ...describe(room), ticket: issue({ room, userId: user.id, authorization, role: 'guest-control' }) };
+      }
+      if (route === '/api/rooms/stream' && req.method === 'POST') {
+        const room = requireMember(user, input.code);
+        if (room.owner === user.id) throw new ApiError(400, '房主不需要本地加入端口');
+        if (streams.size >= 256 || [...streams.values()].filter(channel => channel.room === room).length >= 32 || [...streams.values()].filter(channel => channel.guestId === user.id).length >= 8) throw new ApiError(429, '连接数过多');
+        const id = randomBytes(16).toString('hex');
+        const channel = { id, room, guestId: user.id, created: Date.now(), uploadBytes: 0, downloadBytes: 0 };
+        streams.set(id, channel); channel.timer = setTimeout(() => closeStream(channel), 30000).unref();
+        // The host ticket is bound to the owner and validated again against the saved session.
+        const hostTicket = issue({ room, userId: room.owner, authorization: room.hostAuthorization, role: 'host', streamId: id });
+        room.host.send(JSON.stringify({ type: 'connection', ticket: hostTicket }));
+        return { ticket: issue({ room, userId: user.id, authorization, role: 'guest', streamId: id }) };
+      }
+      if (route === '/api/rooms/leave' && req.method === 'POST') {
+        for (const room of rooms.values()) { if (room.owner === user.id) closeRoom(room); else room.guests.get(user.id)?.close(1000, 'Left'); }
+        return { success: true };
+      }
+      throw new ApiError(404, '未找到房间接口');
+    },
+  };
+}

@@ -1,0 +1,49 @@
+<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL" x:Class="PageServerDeployRight" PanScroll="PanBack">
+    <local:MyPageRight.Resources>
+        <Style TargetType="ProgressBar">
+            <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+            <Setter Property="Background" Value="{DynamicResource ColorBrush6}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid ClipToBounds="True">
+                            <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3" />
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" CornerRadius="3" />
+                            <Border x:Name="WaitingBand" Background="{TemplateBinding Foreground}" CornerRadius="3" Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="WaitingBand" Property="Visibility" Value="Visible" />
+                                <Trigger.EnterActions><BeginStoryboard x:Name="WaitMotion"><Storyboard><DoubleAnimation Storyboard.TargetName="WaitingBand" Storyboard.TargetProperty="Opacity" From="0.2" To="0.8" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever" /></Storyboard></BeginStoryboard></Trigger.EnterActions>
+                                <Trigger.ExitActions><StopStoryboard BeginStoryboardName="WaitMotion" /></Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </local:MyPageRight.Resources>
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25,25,25,10">
+            <TextBlock x:Name="LabHeading" FontSize="18" TextWrapping="Wrap" Margin="0,0,0,8" />
+            <TextBlock x:Name="LabStage" TextWrapping="Wrap" MaxHeight="65" TextTrimming="CharacterEllipsis" Margin="0,0,0,12" Foreground="{DynamicResource ColorBrush3}" />
+            <ProgressBar x:Name="StageProgress" Minimum="0" Maximum="100" Height="4" Margin="0,0,0,10" />
+            <TextBlock x:Name="LabProgress" TextWrapping="Wrap" Margin="0,0,0,10" Foreground="{DynamicResource ColorBrushGray2}" />
+            <TextBlock x:Name="LabDetail" TextWrapping="Wrap" Margin="0,0,0,8" />
+            <ProgressBar x:Name="DetailProgress" Minimum="0" Maximum="100" Height="6" Margin="0,0,0,8" />
+            <TextBlock x:Name="LabTransfer" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrushGray2}" Margin="0,0,0,8" />
+            <TextBlock x:Name="LabElapsed" Margin="0,0,0,15" Foreground="{DynamicResource ColorBrushGray2}" />
+            <WrapPanel Margin="0,0,0,15"><local:MyButton x:Name="BtnPause" Text="暂停部署" Width="110" Height="32" Margin="0,0,10,8" /><local:MyButton x:Name="BtnResume" Text="继续部署" Width="110" Height="32" Margin="0,0,10,8" Visibility="Collapsed" /><local:MyButton x:Name="BtnRetryDeployment" Text="继续上次部署" Width="140" Height="32" Margin="0,0,10,8" Visibility="Collapsed" ColorType="Highlight" /><local:MyButton x:Name="BtnBack" Text="我的服务器" Width="130" Height="32" Margin="0,0,10,8" /><local:MyButton x:Name="BtnManage" Text="服务器管理" Width="130" Height="32" Margin="0,0,10,8" /></WrapPanel>
+            <local:MyCard x:Name="StepsCard" Title="部署步骤" CanSwap="True" IsSwapped="True" Margin="0,0,0,15"><StackPanel x:Name="PanSteps" Margin="20,38,20,18" /></local:MyCard>
+            <StackPanel Margin="0,0,0,15">
+                <DockPanel Margin="0,0,0,10"><local:MyButton x:Name="BtnCopyLog" Text="复制日志" Width="100" Height="32" DockPanel.Dock="Right" /><local:MyCheckBox x:Name="FollowLog" Text="跟随输出" Checked="True" Height="22" VerticalAlignment="Center" /></DockPanel>
+                <TabControl x:Name="LogTabs" Height="260">
+                    <TabItem Header="部署事件"><TextBox x:Name="LabLog" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" BorderThickness="0" Padding="12" FontFamily="Consolas" /></TabItem>
+                    <TabItem Header="远端终端"><TextBox x:Name="LabTerminal" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" BorderThickness="0" Padding="12" FontFamily="Consolas" /></TabItem>
+                </TabControl>
+            </StackPanel>
+            <local:MyCard x:Name="PanResult" Title="部署结果" Visibility="Collapsed" Margin="0,0,0,15"><TextBox x:Name="LabResult" Margin="20,38,20,18" IsReadOnly="True" AcceptsReturn="True" MaxHeight="160" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" BorderThickness="0" /></local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

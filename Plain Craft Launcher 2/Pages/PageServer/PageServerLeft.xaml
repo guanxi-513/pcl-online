@@ -1,0 +1,11 @@
+<local:MyPageLeft xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL"
+    x:Class="PageServerLeft" AnimatedControl="PanItem">
+    <StackPanel x:Name="PanItem" Margin="0,12,0,0">
+        <local:MyListItem Title="连接设置" Type="RadioBox" Checked="True" Tag="0" Height="36" MinPaddingRight="35" IsScaleAnimationEnabled="False" />
+        <local:MyListItem Title="服务器概览" Type="RadioBox" Tag="1" Height="36" MinPaddingRight="35" IsScaleAnimationEnabled="False" />
+        <local:MyListItem Title="模组与插件" Type="RadioBox" Tag="2" Height="36" MinPaddingRight="35" IsScaleAnimationEnabled="False" />
+        <local:MyListItem Title="游戏与设置" Type="RadioBox" Tag="3" Height="36" MinPaddingRight="35" IsScaleAnimationEnabled="False" />
+        <local:MyListItem Title="玩家管理" Type="RadioBox" Tag="4" Height="36" MinPaddingRight="35" IsScaleAnimationEnabled="False" />
+    </StackPanel>
+</local:MyPageLeft>

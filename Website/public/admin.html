@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>管理后台 | CPT 方舟领航</title><link rel="icon" type="image/png" href="/logo.png?v=cpt-1"><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/management.js" defer></script></head>
+<body data-page="admin">
+<header><a class="brand" href="/"><img src="/logo.png?v=cpt-1" alt="CPT" width="32" height="32">CPT 方舟领航</a><span>管理后台</span><button id="logout" hidden>退出登录</button></header>
+<main>
+  <p id="message" role="status" hidden></p>
+  <section id="login-panel"><h1>管理员登录</h1><form id="login"><label>管理密码<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label><button type="submit">登录</button></form></section>
+  <div id="dashboard" hidden>
+    <nav class="admin-tabs" aria-label="后台视图"><button type="button" data-view="stats-view" aria-pressed="true">统计与更新</button><button type="button" data-view="users-view" aria-pressed="false">用户管理</button><button type="button" data-view="rooms-view" aria-pressed="false">在线房间</button><button type="button" data-view="audit-view" aria-pressed="false">操作日志</button><button type="button" data-view="mail-view" aria-pressed="false">邮箱配置</button></nav>
+    <div id="stats-view" class="admin-view">
+    <div class="section-heading"><h1>用户统计</h1><button id="refresh" title="刷新统计" aria-label="刷新统计">↻</button></div>
+    <dl class="metrics"><div><dt>累计注册用户</dt><dd id="total">0</dd></div><div><dt>24 小时活跃用户</dt><dd id="active">0</dd></div><div><dt>30 天活跃用户</dt><dd id="monthly">0</dd></div></dl>
+    <div class="tables"><section><h2>账号状态</h2><table><thead><tr><th>状态</th><th>用户数</th></tr></thead><tbody id="user-statuses"></tbody></table></section><section><h2>每日用户统计</h2><div class="table-scroll"><table><thead><tr><th>日期 (UTC)</th><th>新增注册</th><th>活跃用户</th></tr></thead><tbody id="daily"></tbody></table></div></section></div>
+    <section class="release"><h2>发布更新</h2><form id="publish" class="form-grid">
+      <label>版本号<input name="version" placeholder="2.13.1.2" required pattern="[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?"></label>
+      <label>内部版本号<input name="buildCode" type="number" min="1" max="2147483647" required></label>
+      <label>发布通道<select name="channel"><option value="release">正式版</option><option value="snapshot">快照版</option></select></label>
+      <label>提取码<input name="extractionCode" maxlength="16" pattern="[A-Za-z0-9]*"></label>
+      <label class="full">迅雷网盘分享链接<input name="url" type="url" placeholder="https://pan.xunlei.com/s/..." required></label>
+      <label class="full">更新说明<textarea name="notes" rows="5" maxlength="20000" required></textarea></label>
+      <button type="submit">发布更新</button>
+    </form></section>
+    <section><h2>发布记录</h2><div class="table-scroll"><table><thead><tr><th>版本</th><th>内部版本号</th><th>通道</th><th>状态</th><th>操作</th></tr></thead><tbody id="releases"></tbody></table></div></section>
+    </div>
+    <div id="users-view" class="admin-view" hidden>
+      <section><div class="section-heading"><h2>CPT 用户</h2><button id="refresh-users" type="button">刷新</button></div>
+        <p id="user-summary" class="list-summary" role="status"></p>
+        <form id="user-filters" class="management-filters"><label>搜索<input name="q" placeholder="邮箱、昵称或用户编号" maxlength="100" type="search"></label><label>状态<select name="status"><option value="all">全部账号</option><option value="enabled">正常</option><option value="disabled">已停用</option><option value="recent">最近 5 分钟活动</option></select></label><label>排序<select name="sort"><option value="newest">最新注册</option><option value="oldest">最早注册</option><option value="login">最近登录</option></select></label><label>每页<select name="pageSize"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label><button type="submit">查询</button></form>
+        <div class="batch-toolbar"><span id="selection-summary">已选择 0 位用户</span><select id="batch-action" aria-label="批量操作"><option value="disable">停用所选账号</option><option value="enable">启用所选账号</option><option value="revoke">撤销所选账号登录</option></select><button id="batch-submit" type="button" disabled>执行批量操作</button></div>
+        <div class="table-scroll management-table"><table><thead><tr><th><input id="users-select-all" type="checkbox" aria-label="选择本页所有用户"></th><th>编号</th><th>邮箱 / 昵称</th><th>状态</th><th>注册时间</th><th>最近登录</th><th>有效会话</th><th>操作</th></tr></thead><tbody id="users"></tbody></table></div>
+        <div class="pagination"><button id="users-prev" type="button" aria-label="用户上一页" title="上一页">&larr;</button><span id="users-page" role="status"></span><button id="users-next" type="button" aria-label="用户下一页" title="下一页">&rarr;</button></div>
+      </section>
+    </div>
+    <div id="rooms-view" class="admin-view" hidden>
+      <section><div class="section-heading"><h2>在线房间</h2><div class="inline-tools"><label class="check-label"><input id="rooms-auto" type="checkbox" checked>自动刷新</label><button id="refresh-rooms" type="button">刷新</button></div></div>
+        <p id="room-summary" class="list-summary" role="status"></p>
+        <form id="room-filters" class="management-filters"><label>搜索<input name="q" placeholder="房间号、房主昵称或编号" type="search" maxlength="100"></label><label>状态<select name="state"><option value="all">全部房间</option><option value="active">运行中</option><option value="waiting">等待连接</option><option value="locked">已限制加入</option></select></label><label>排序<select name="sort"><option value="newest">最新创建</option><option value="members">人数最多</option><option value="traffic">流量最多</option></select></label><label>每页<select name="pageSize"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label><button type="submit">查询</button></form>
+        <div class="table-scroll management-table"><table><thead><tr><th>房间号</th><th>房主</th><th>状态</th><th>人数</th><th>连接</th><th>存续时间</th><th>累计流量</th><th>操作</th></tr></thead><tbody id="rooms"></tbody></table></div>
+        <div class="pagination"><button id="rooms-prev" type="button" aria-label="房间上一页" title="上一页">&larr;</button><span id="rooms-page" role="status"></span><button id="rooms-next" type="button" aria-label="房间下一页" title="下一页">&rarr;</button></div><p id="room-updated" class="muted" role="status"></p>
+      </section>
+    </div>
+    <div id="audit-view" class="admin-view" hidden>
+      <section><h2>管理操作日志</h2><form id="audit-filters" class="management-filters"><label>搜索<input name="q" type="search" maxlength="100" placeholder="操作、目标或原因"></label><button type="submit">查询</button></form><div class="table-scroll management-table"><table><thead><tr><th>时间</th><th>操作</th><th>目标</th><th>原因</th></tr></thead><tbody id="audit"></tbody></table></div><div class="pagination"><button id="audit-prev" type="button" aria-label="日志上一页">&larr;</button><span id="audit-page" role="status"></span><button id="audit-next" type="button" aria-label="日志下一页">&rarr;</button></div></section>
+    </div>
+    <div id="mail-view" class="admin-view" hidden>
+      <section><h2>邮箱服务</h2><p id="mail-status" role="status"></p><form id="mail-settings" class="form-grid">
+        <label class="check-label full"><input name="enabled" type="checkbox">启用邮箱注册与找回密码</label>
+        <label class="full">邮箱服务<select id="mail-provider"><option value="custom">自定义 SMTP</option><option value="qq">QQ 邮箱</option><option value="163">网易 163 邮箱</option><option value="126">网易 126 邮箱</option><option value="yeah">网易 Yeah 邮箱</option></select></label>
+        <label>SMTP 主机<input name="host" required maxlength="253" placeholder="smtp.example.com"></label>
+        <label>SMTP 端口<select name="port"><option value="465">465</option><option value="587">587</option><option value="2525">2525</option></select></label>
+        <label class="check-label full"><input name="secure" type="checkbox" checked>使用直接 TLS 连接</label>
+        <label>SMTP 用户名<input name="user" required maxlength="254" autocomplete="off"></label>
+        <label>SMTP 授权码或密码<input name="password" type="password" maxlength="512" autocomplete="new-password" placeholder="QQ / 网易填写 SMTP 授权码"></label>
+        <label class="full">发件邮箱<input name="from" type="email" required maxlength="254"></label>
+        <button type="submit">保存配置</button>
+      </form></section>
+      <section><h2>测试邮件</h2><form id="mail-test" class="form-grid"><label>收件邮箱<input name="email" type="email" required maxlength="254"></label><button type="submit">发送测试邮件</button></form></section>
+    </div>
+  </div>
+</main>
+<dialog id="user-dialog" aria-labelledby="user-dialog-title"><div class="dialog-heading"><h2 id="user-dialog-title">用户详情</h2><button type="button" data-close="user-dialog" aria-label="关闭用户详情" title="关闭">&times;</button></div><p id="user-detail-summary" class="muted"></p><form id="user-edit" class="form-grid"><label>昵称<input name="nickname" required minlength="2" maxlength="24"></label><label>账号状态<select name="disabled"><option value="false">正常</option><option value="true">已停用</option></select></label><label class="full">管理备注<textarea name="note" rows="3" maxlength="2000"></textarea></label><label class="full">操作原因<input name="reason" maxlength="500"></label><button type="submit">保存账号信息</button><button id="user-revoke" type="button" class="secondary">撤销全部登录</button></form><h3>有效登录会话</h3><div class="table-scroll"><table><thead><tr><th>创建时间</th><th>最近活动</th><th>到期时间</th></tr></thead><tbody id="user-sessions"></tbody></table></div><h3>当前房间</h3><div id="user-rooms"></div><p id="user-dialog-message" role="status"></p></dialog>
+<dialog id="room-dialog" aria-labelledby="room-dialog-title"><div class="dialog-heading"><h2 id="room-dialog-title">房间详情</h2><div class="inline-tools"><button id="room-detail-refresh" type="button">刷新</button><button type="button" data-close="room-dialog" aria-label="关闭房间详情" title="关闭">&times;</button></div></div><p id="room-detail-summary" class="muted"></p><form id="room-edit" class="form-grid"><label class="check-label"><input name="locked" type="checkbox">限制新成员加入</label><label>人数上限<input name="capacity" type="number" min="2" max="8" required></label><label class="full">操作原因<input name="reason" maxlength="500" required></label><button type="submit">保存房间设置</button><button id="room-close" type="button" class="danger">关闭房间</button></form><h3>房间成员</h3><div class="table-scroll"><table><thead><tr><th>编号 / 昵称</th><th>身份</th><th>连接状态</th><th>加入时间</th><th>最近心跳</th><th>操作</th></tr></thead><tbody id="room-members"></tbody></table></div><h3>游戏连接</h3><div class="table-scroll"><table><thead><tr><th>连接编号</th><th>用户</th><th>状态</th><th>上行 / 下行</th><th>操作</th></tr></thead><tbody id="room-connections"></tbody></table></div><h3>本房间加入限制</h3><div id="room-blocked"></div><p id="room-dialog-message" role="status"></p></dialog>
+<dialog id="action-dialog" aria-labelledby="action-title"><form id="action-form"><h2 id="action-title">确认操作</h2><p id="action-description"></p><label>操作原因<textarea id="action-reason" maxlength="500" required rows="3"></textarea></label><label id="action-block-label" class="check-label" hidden><input id="action-block" type="checkbox">禁止该用户再次加入本房间</label><p id="action-error" role="status"></p><div class="inline-tools"><button type="submit">确认执行</button><button id="action-cancel" type="button" class="secondary">取消</button></div></form></dialog>
+<footer>用户统计按 CPT 账号去重。同一账号在多个设备使用仍计为一位用户，不代表真实自然人数。</footer>
+</body></html>

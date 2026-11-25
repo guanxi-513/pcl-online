@@ -1,0 +1,62 @@
+11:13:05.544 I <4 · Logger> [Logger] PclLogger 日志初始化结束
+11:13:05.569 I [Application] 程序版本：正式版 2.13.1.1 (408)
+11:13:05.569 I [Application] 识别码：20C4-42DE-A714-912A
+11:13:05.569 I [Application] 程序路径：D:\appppp\cpt2\PCL-main\最新正式版\Plain Craft Launcher 2.exe
+11:13:05.569 I [Application] 系统编码：gb2312 (936, GBK=True)
+11:13:05.570 I [Application] 管理员权限：False
+11:13:05.570 I [Application] 第一阶段加载用时：41 ms
+11:13:05.658 I [FormMain] 全新的 PCL，使用新的版本隔离默认值
+11:13:05.665 I [ModSecret] 刷新主题：0
+11:13:05.693 I [ModLoader] 加载器 LoaderTask`2 Minecraft Folder List 状态改变：Loading
+11:13:05.693 I [FormMain] 第二阶段加载用时：118 ms
+11:13:05.698 I <5 · L/Minecraft Folder List> [ModMinecraft] 已创建 launcher_profiles.json：D:\appppp\cpt2\PCL-main\最新正式版\.minecraft\
+11:13:05.698 I <5 · L/Minecraft Folder List> [ModLoader] 加载器 LoaderTask`2 Minecraft Folder List 状态改变：Finished
+11:13:05.823 I [FormMain] 从设置更新背景图片与标题栏样式
+11:13:05.860 I [FormMain] 窗口已置顶，位置：(403.333333333333, 234.666666666667), 900 x 550
+11:13:05.864 I [FormMain] 第三阶段加载用时：43 ms
+11:13:05.864 I <8 · Animation> [ModAnimation] 动画线程开始
+11:13:05.871 I <12 · Version Check> [PageLaunchLeft] 没有已储存的 Minecraft 文件夹
+11:13:05.871 I <12 · Version Check> [ModLoader] 加载器 LoaderTask`2 Minecraft Folder List 状态改变：Loading
+11:13:05.872 I <13 · L/Minecraft Folder List> [ModLoader] 加载器 LoaderTask`2 Minecraft Folder List 状态改变：Finished
+11:13:05.890 I <12 · Version Check> [ModMinecraft] 当前选择的 Minecraft 文件夹：D:\appppp\cpt2\PCL-main\最新正式版\.minecraft\
+11:13:05.890 I <12 · Version Check> [PageLaunchLeft] 当前选择的 Minecraft 版本无效：null
+11:13:05.896 I <12 · Version Check> [ModLoader] 加载器 LoaderTask`2 Minecraft Instance List 状态改变：Loading
+11:13:05.900 I [ModLoader] 加载器 LoaderTask`2 Loader Skin Ms 状态改变：Loading
+11:13:05.903 I <14 · L/Minecraft Instance List> [ModMinecraft] 当前选择的 Minecraft 版本：无
+11:13:05.905 I <14 · L/Minecraft Instance List> [ModMinecraft] 未找到可用 Minecraft 版本
+11:13:05.905 I <14 · L/Minecraft Instance List> [ModLoader] 加载器 LoaderTask`2 Minecraft Instance List 状态改变：Finished
+11:13:05.906 I <15 · L/Loader Skin Ms> [ModLoader] 加载器 LoaderTask`2 Loader Skin Ms 状态改变：Finished
+11:13:05.918 I <12 · Version Check> [PageLaunchLeft] 无可用 Minecraft 版本
+11:13:05.930 I [PageLaunchRight] 实例化：清空主页 UI，来源为空
+11:13:05.935 I [ModBase] 将资源写入到文件：libwebp64 → C:\Users\**\AppData\Roaming\PCL\libwebp.dll
+11:13:05.939 I [MySkin] 载入头像成功：Loader Skin Ms
+11:13:05.949 I [PageLaunchLeft] 启动按钮：无 Minecraft 版本，要求下载
+11:13:05.953 I [ModLoader] 加载器 LoaderTask`2 登录 状态改变：Loading
+11:13:05.954 I <16 · L/登录> [ModLaunch] 登录加载已开始
+11:13:05.954 I <16 · L/登录> [ModLoader] 加载器 LoaderTask`2 Loader Login Ms 状态改变：Loading
+11:13:05.956 I <17 · L/Loader Login Ms> [ModLaunch] 登录方式：正版（xiaoqi_333）
+11:13:05.959 I <17 · L/Loader Login Ms> [ModLaunch] 无需登录，AccessToken 尚未过期
+11:13:05.959 I <17 · L/Loader Login Ms> [ModLaunch] 微软登录结束，AccessToken 将在 2026/10/12 下午 9:17:53 过期
+11:13:05.959 I <17 · L/Loader Login Ms> [ModLoader] 加载器 LoaderTask`2 Loader Login Ms 状态改变：Finished
+11:13:05.980 I <16 · L/登录> [ModLaunch] 登录加载已结束
+11:13:05.980 I <16 · L/登录> [ModLoader] 加载器 LoaderTask`2 登录 状态改变：Finished
+11:13:06.011 I <10 · 初始化> [ModJava] 共有 3 个可用的 Java：
+11:13:06.011 I <10 · 初始化> [ModJava] - Java 8 (8.0.51.0)：C:\Users\**\AppData\Roaming\.minecraft\runtime\jre-legacy\bin\
+11:13:06.011 I <10 · 初始化> [ModJava] - Java 21 (21.0.12.0)：C:\Program Files\Microsoft\jdk-21.0.12.8-hotspot\bin\
+11:13:06.011 I <10 · 初始化> [ModJava] - Java 21 (21.0.7.0)：C:\Users\**\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\
+11:13:06.121 I <10 · 初始化> [ModLoader] 加载器 LoaderTask`2 DlClientList Mojang 状态改变：Loading
+11:13:06.122 I <10 · 初始化> [ModLoader] 加载器 LoaderTask`2 PCL 配置更新 状态改变：Loading
+11:13:06.123 I <20 · TryClearTaskTemp> [ModMain] 开始清理任务缓存文件夹
+11:13:06.123 I <20 · TryClearTaskTemp> [ModMain] 已清理任务缓存文件夹
+11:13:06.124 I <21 · Telemetry> [ModMain] 匿名数据上报：启动
+11:13:06.126 I <18 · L/DlClientList Mojang> [ModNet] 发起网络请求（GET，https://launchermeta.mojang.com/mc/game/version_manifest.json），最大超时 10000
+11:13:06.130 I <19 · L/PCL 配置更新> [ModSecret] 已读取本地缓存的配置：38
+11:13:06.130 I <19 · L/PCL 配置更新> [ModNet] 发起网络请求（GET，https://pcl2-server-1253424809.file.myqcloud.com/notice.cfg{CDN}），最大超时 10000
+11:13:06.409 I <19 · L/PCL 配置更新> [ModSecret] 本地公告编号：224，服务器公告：224|410|408|5|38，无需更新
+11:13:06.413 I <19 · L/PCL 配置更新> [ModLoader] 加载器 LoaderTask`2 PCL 配置更新 状态改变：Finished
+11:13:06.588 I [FormMain] DPI：144，系统版本：Microsoft Windows NT 10.0.26200.0，PCL 位置：D:\appppp\cpt2\PCL-main\最新正式版\Plain Craft Launcher 2.exe
+11:13:06.790 I <18 · L/DlClientList Mojang> [ModDownload] Mojang 官方源加载耗时：667ms，可优先使用官方源
+11:13:06.792 I <18 · L/DlClientList Mojang> [ModLoader] 加载器 LoaderTask`2 DlClientList Mojang 状态改变：Finished
+11:13:09.714 I [MyIconButton] 按下图标按钮：BtnTitleClose
+11:13:09.716 I [FormMain] 收到关闭指令
+11:13:09.944 I [FormMain] 程序已退出，返回值：Success
